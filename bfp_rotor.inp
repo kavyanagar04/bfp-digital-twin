@@ -1,0 +1,194 @@
+! ==========================================================================
+! bfp_rotor.inp
+! Boiler feed pump rotor - digital twin core, native APDL input file
+!
+! HOW TO USE (Mechanical APDL GUI):
+!   1. Launch "Mechanical APDL Product Launcher"
+!   2. Set the working directory to the folder holding this file
+!   3. Job name: bfp_rotor    ->  Run
+!   4. In the GUI:  File > Read Input from...  > select this file
+!   5. The model, the critical speed list and the mode shapes appear.
+!
+! HOW TO USE (batch, no GUI):
+!   "D:\Program Files\ANSYS Inc\v242\ansys\bin\winx64\ANSYS242.exe" ^
+!       -b -i bfp_rotor.inp -o bfp_rotor.out
+! ==========================================================================
+
+FINISH
+/CLEAR,NOSTART
+/FILNAME,bfp_rotor
+/TITLE,Boiler feed pump rotor - digital twin core
+
+! --------------------------------------------------------------------------
+! PARAMETERS  (edit only here)
+! --------------------------------------------------------------------------
+PI     = ACOS(-1)
+
+SL     = 1.20          ! m       bearing-to-bearing span
+SD     = 0.100         ! m       shaft outer diameter
+NEL    = 24            ! -       beam elements along the shaft
+
+EMOD   = 2.0E11        ! Pa      steel
+PRAT   = 0.30
+RHO    = 7850          ! kg/m3
+
+NSTG   = 4             ! -       number of impellers
+MIMP   = 25.0          ! kg      mass per impeller
+IIP    = 0.60          ! kg.m2   polar (spin) inertia
+IIT    = 0.35          ! kg.m2   transverse inertia
+
+BK     = 2.0E8         ! N/m     bearing direct stiffness
+BC     = 1.5E4         ! N.s/m   bearing direct damping
+BKXY   = 0.0           ! N/m     cross-coupled stiffness (raise to test
+                       !         rotordynamic instability)
+
+RPM    = 3000          ! rev/min rated speed
+NMODE  = 10            ! -       modes to extract
+
+DX     = SL/NEL
+SPIN   = RPM*2*PI/60
+
+! --------------------------------------------------------------------------
+! MODEL
+! --------------------------------------------------------------------------
+/PREP7
+
+MP,EX,1,EMOD
+MP,PRXY,1,PRAT
+MP,DENS,1,RHO
+
+! ---- shaft: BEAM188, circular solid section ------------------------------
+ET,1,188
+KEYOPT,1,3,3                   ! cubic shape function
+SECTYPE,1,BEAM,CSOLID
+SECDATA,SD/2
+
+*DO,I,1,NEL+1
+  N,I,(I-1)*DX,0,0
+*ENDDO
+
+TYPE,1
+MAT,1
+SECNUM,1
+*DO,I,1,NEL
+  E,I,I+1
+*ENDDO
+
+! ---- impellers: MASS21 with rotary inertia -------------------------------
+ET,2,21
+KEYOPT,2,3,0
+R,2,MIMP,MIMP,MIMP,IIP,IIT,IIT
+
+TYPE,2
+REAL,2
+*DO,S,1,NSTG
+  XI = SL*S/(NSTG+1)
+  ND = NINT(XI/DX)+1
+  E,ND
+*ENDDO
+
+! ---- rotating component (CORIOLIS / CMOMEGA act on this) -----------------
+ESEL,S,TYPE,,1
+ESEL,A,TYPE,,2
+CM,ROTOR,ELEM
+ALLSEL,ALL
+
+! ---- journal bearings: COMBI214 in the YZ plane --------------------------
+ET,3,214
+KEYOPT,3,2,1                   ! element lies in the YZ plane (axis = X)
+KEYOPT,3,3,1                   ! no rotational dof
+R,3,BK,BK,BC,BC,BKXY,-BKXY     ! K11,K22,C11,C22,K12,K21
+
+N,1001,0,0,0                   ! grounded housing nodes
+N,1002,SL,0,0
+
+TYPE,3
+REAL,3
+E,1,1001
+E,NEL+1,1002
+
+D,1001,ALL,0
+D,1002,ALL,0
+D,1,UX,0                       ! axial restraint
+D,1,ROTX,0                     ! spin handled by CORIOLIS
+ALLSEL,ALL
+
+! ---- look at the model before solving ------------------------------------
+/VIEW,1,1,0.4,0.6
+/ANG,1
+/PNUM,TYPE,1
+/NUMBER,1
+/TRIAD,ORIG
+EPLOT
+FINISH
+
+! --------------------------------------------------------------------------
+! MODAL SOLVE - critical speeds at rated speed, gyroscopics active
+! --------------------------------------------------------------------------
+/SOLU
+ANTYPE,MODAL
+MODOPT,QRDAMP,NMODE,0,5000,,ON     ! complex eigensolution
+MXPAND,NMODE,,,YES
+CORIOLIS,ON,,,ON                   ! stationary reference frame
+CMOMEGA,ROTOR,SPIN
+SOLVE
+FINISH
+
+! --------------------------------------------------------------------------
+! POST - critical speed table and mode shapes
+! --------------------------------------------------------------------------
+/POST1
+SET,LIST                           ! <-- the critical speed list
+
+/VIEW,1,1,0.4,0.6
+/ANG,1
+/DSCALE,1,15                       ! exaggerate the deflection
+
+SET,1,1
+PLDISP,1                           ! mode 1 shape
+SET,1,2
+PLDISP,1                           ! mode 2 shape
+SET,1,3
+PLDISP,1
+SET,1,4
+PLDISP,1
+
+! animate the first mode - this is the one that looks like a digital twin
+SET,1,1
+ANMODE,12,0.4,,0
+FINISH
+
+! ==========================================================================
+! OPTIONAL BLOCK 1 - Campbell diagram (critical speeds vs shaft speed)
+! Remove the leading "!" on each line to run it.
+! ==========================================================================
+!/SOLU
+!ANTYPE,MODAL
+!MODOPT,QRDAMP,NMODE,0,5000,,ON
+!MXPAND,NMODE,,,YES
+!CORIOLIS,ON,,,ON
+!*DO,K,0,5
+!  CMOMEGA,ROTOR,K*750*2*PI/60
+!  SOLVE
+!*ENDDO
+!FINISH
+!/POST1
+!PLCAMP,ON,1.0,RPM,,ROTOR
+!PRCAMP,ON,1.0,RPM,,ROTOR
+!FINISH
+
+! ==========================================================================
+! OPTIONAL BLOCK 2 - state-space ROM export for Twin Builder
+! Writes bfp_rotor.spm, which Twin Builder imports as a
+! "State Space Dynamic Model" component.
+! ==========================================================================
+!/PREP7
+!NSEL,S,NODE,,NEL/2+1
+!CM,IN_UNBAL,NODE
+!NSEL,A,NODE,,NEL+1
+!CM,OUT_SENS,NODE
+!ALLSEL,ALL
+!FINISH
+!/POST1
+!SPMWRITE,MODAL,NMODE,IN_UNBAL,,OUT_SENS,,1,0
+!FINISH

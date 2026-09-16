@@ -1,0 +1,41 @@
+# --- twin run outputs (regenerate with the scripts; do not commit) -------
+twin_outputs/
+*.png
+!examples/*.png
+
+# --- ANSYS / MAPDL working files -----------------------------------------
+*.err
+*.log
+*.out
+*.db
+*.rst
+*.rdsp
+*.esav
+*.emat
+*.full
+*.mode
+*.lock
+*.stat
+*.DSP
+*.BCS
+*.spm
+file.*
+anstmp*/
+_MatML_Rep*
+cleanup*.bat
+.__tmp__*
+
+# --- Python ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+*.egg-info/
+
+# --- editors / OS ---------------------------------------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

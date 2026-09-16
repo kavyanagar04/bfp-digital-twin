@@ -1,0 +1,13 @@
+# Python dependencies for the BFP digital twin
+# Install with:  pip install -r requirements.txt
+#
+# ANSYS itself is NOT a pip package and cannot be bundled here - it must be
+# installed separately (Ansys Student is sufficient). Everything below is
+# free and installs from PyPI.
+
+numpy>=1.24            # hydraulic model, array maths
+matplotlib>=3.7         # all plotting in view_twin.py
+
+# --- needed only for the ANSYS half (skip if you use --no-mapdl) ---------
+ansys-mapdl-core>=0.68  # drives MAPDL from Python; pulls in pyvista, pandas,
+                        # protobuf, grpcio and ansys-tools-path automatically
